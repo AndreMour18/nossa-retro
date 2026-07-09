@@ -1,11 +1,63 @@
 # Nossa Retro 💛
 
-Micro-SaaS de retrospectiva de relacionamento: o comprador preenche fotos,
-datas e a música do casal, paga via Pix e recebe um link + QR code com uma
-retrospectiva animada para presentear.
+> A história de vocês, contada como merece.
 
-Stack: **Next.js 14 (App Router) · Tailwind · Framer Motion · Supabase ·
-Mercado Pago (Pix) · Resend · Vercel**
+Micro-SaaS de retrospectivas de relacionamento: o comprador monta uma
+retrospectiva animada com as fotos, os momentos e a música do casal, paga
+**R$ 19,90 via Pix** e recebe um link eterno + QR code para presentear —
+pronto para esconder num cartão, numa caixa ou num buquê.
+
+<p align="center">
+  <img src="docs/story-capa.png" width="24%" alt="Capa da retrospectiva" />
+  <img src="docs/story-foto.png" width="24%" alt="Slide de foto" />
+  <img src="docs/criar.png" width="24%" alt="Formulário de criação" />
+</p>
+<p align="center">
+  <img src="docs/landing.png" width="72%" alt="Landing page" />
+</p>
+
+## Como funciona
+
+1. **Cria** — formulário em 5 etapas (nomes/data, fotos, momentos, música,
+   mensagem final), com prévia real da retrospectiva antes de pagar.
+2. **Paga** — QR code Pix na tela; a confirmação aparece sozinha em
+   segundos, sem recarregar a página.
+3. **Presenteia** — link exclusivo e permanente + QR code para download,
+   entregues na tela e por e-mail.
+
+A retrospectiva abre em formato *story* (toque para avançar), com contador
+ao vivo do tempo juntos, embed de Spotify/YouTube e respeito a
+`prefers-reduced-motion`.
+
+## Stack
+
+| Camada | Tecnologia |
+| --- | --- |
+| Framework | Next.js 14 (App Router) + TypeScript |
+| UI | Tailwind CSS + Framer Motion |
+| Banco + storage | Supabase (Postgres com RLS + bucket público) |
+| Pagamento | Mercado Pago — **Orders API** (Pix) |
+| E-mail transacional | Resend |
+| Hospedagem | Vercel |
+
+## Decisões de arquitetura
+
+- **Sem login** — menos fricção na compra; o comprador é identificado pelo
+  e-mail. Rascunhos ficam no `localStorage` **e** no banco, retomáveis.
+- **Escrita só pelo servidor** — o client nunca fala direto com o banco:
+  RLS ligado e toda escrita passa pelas API routes com service role.
+- **Confirmação de pagamento em duas vias** — webhook (com validação da
+  assinatura `x-signature`) **e** polling que consulta o Mercado Pago
+  diretamente. Webhook perdido não trava a entrega, e em localhost o
+  fluxo completo funciona sem ngrok.
+- **Sandbox transparente** — fora de https, o checkout se adapta ao
+  ambiente de teste do MP (pagador `@testuser.com` + nome `APRO`, que
+  aprova o Pix automaticamente em segundos).
+- **Fotos comprimidas no navegador** antes do upload
+  (`browser-image-compression`) — menos banda, storage e espera.
+- **Links não indexáveis** (`noindex`) com slugs aleatórios de 12
+  caracteres; rascunhos expiram em 7 dias, retrospectivas pagas são
+  permanentes (argumento de venda).
 
 ## Rodando localmente
 
@@ -15,74 +67,31 @@ cp .env.example .env.local   # preencha as chaves (veja abaixo)
 npm run dev
 ```
 
-Rotas úteis desde o primeiro `npm run dev` (sem precisar de banco):
+`/`, `/r/demo` e `/criar` funcionam de cara, sem chave nenhuma. Para o
+fluxo completo (upload, rascunho no banco, Pix, e-mail):
 
-- `/` — landing page
-- `/r/demo` — retrospectiva de demonstração (dados embutidos no código)
-- `/criar` — formulário de criação (etapa 1 pronta, demais em construção)
+1. **Supabase** — crie um projeto, rode `supabase/schema.sql` no SQL
+   Editor, crie um bucket público `fotos` e copie URL + chaves
+   (Project Settings → API).
+2. **Mercado Pago** — crie uma aplicação em
+   [developers](https://www.mercadopago.com.br/developers) e use o Access
+   Token **de teste** no `MP_ACCESS_TOKEN`. O pagamento de teste aprova
+   sozinho em segundos.
+3. **Resend** — crie a conta, verifique seu domínio (SPF/DKIM) e preencha
+   `RESEND_API_KEY` e `EMAIL_FROM`.
 
-## Setup dos serviços
+## Deploy
 
-### 1. Supabase (banco + fotos)
+1. Importe o repositório na [Vercel](https://vercel.com) e configure as
+   variáveis de ambiente (com `NEXT_PUBLIC_APP_URL` em https e credenciais
+   de **produção** do MP, homologadas).
+2. No painel do MP, configure o webhook (tópico *orders*) apontando para
+   `/api/webhook` e copie a assinatura secreta para `MP_WEBHOOK_SECRET`.
+3. Agende a limpeza de rascunhos expirados (cron do Supabase — SQL de
+   exemplo em `supabase/schema.sql`).
 
-1. Crie um projeto em [supabase.com](https://supabase.com) (plano gratuito).
-2. No **SQL Editor**, rode o conteúdo de `supabase/schema.sql`.
-3. Em **Storage**, crie um bucket público chamado `fotos`.
-4. Em **Project Settings → API**, copie a URL e as chaves para o `.env.local`.
+---
 
-### 2. Mercado Pago (Pix)
-
-1. Crie uma conta de vendedor e uma aplicação em
-   [mercadopago.com.br/developers](https://www.mercadopago.com.br/developers).
-2. Use primeiro as **credenciais de teste** para desenvolver, depois troque
-   pelas de produção.
-3. Copie o Access Token para `MP_ACCESS_TOKEN`.
-4. Para testar o webhook localmente, exponha seu localhost com
-   `ngrok http 3000` e aponte `NEXT_PUBLIC_APP_URL` para a URL do ngrok.
-
-### 3. Resend (e-mail)
-
-1. Crie conta em [resend.com](https://resend.com) (3 mil e-mails/mês grátis).
-2. Verifique seu domínio (SPF/DKIM) para os e-mails não caírem em spam.
-3. Copie a API key para `RESEND_API_KEY`.
-
-### 4. Deploy (Vercel)
-
-1. Suba o repositório para o GitHub.
-2. Importe na [Vercel](https://vercel.com) e cole as variáveis de ambiente.
-3. Aponte `NEXT_PUBLIC_APP_URL` para o domínio final.
-
-## O que já está pronto
-
-- Estrutura completa do projeto e tema visual (noite estrelada + dourado)
-- Landing page com o contador ao vivo como demonstração
-- `StoryPlayer`: o motor da retrospectiva em formato story (capa, contador,
-  fotos, momentos, música via embed, mensagem final), com barra de progresso,
-  navegação por toque e respeito a `prefers-reduced-motion`
-- Retrospectiva `/r/demo` funcionando com dados embutidos
-- Etapa 1 do formulário de criação
-- API de checkout Pix (`/api/checkout`) e webhook de confirmação
-  (`/api/webhook`) com envio de e-mail de entrega
-
-## Próximos passos (em ordem)
-
-1. **Upload de fotos**: rota `/api/upload` recebendo imagens comprimidas no
-   client (`browser-image-compression`) e salvando no bucket `fotos`.
-2. **Rascunho**: rota `/api/rascunho` salvando o formulário a cada etapa.
-3. **Etapas 2-5 do formulário** (fotos, momentos, música, mensagem).
-4. **Preview bloqueado** + tela de checkout com QR code e polling do status.
-5. **Página de sucesso** com link, cópia e download do QR code.
-6. **Validar assinatura do webhook** do Mercado Pago (`x-signature`).
-7. Fotos reais de banco de imagens em `public/demo/` para a `/r/demo`.
-8. Página `/privacidade` (LGPD: uso das fotos, exclusão sob pedido).
-
-## Decisões de arquitetura
-
-- **Sem login**: menos fricção; o comprador é identificado pelo e-mail e o
-  rascunho é recuperável por link mágico (futuro).
-- **RLS ligado, escrita só pelo servidor**: o client nunca fala direto com o
-  banco; tudo passa pelas API routes com service role.
-- **Links não indexáveis** (`noindex`) e slugs aleatórios de 12 caracteres:
-  privacidade por obscuridade forte o suficiente para o caso de uso.
-- **Rascunhos expiram em 7 dias**; retrospectivas pagas são permanentes
-  (argumento de venda).
+Projeto comercial em desenvolvimento — feito com ❤️ no Brasil.
+Código público apenas para fins de portfólio; todos os direitos
+reservados (veja [LICENSE](LICENSE)).
