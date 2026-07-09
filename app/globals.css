@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink: #14101e;
+  --plum: #241b36;
+  --gold: #e8b45a;
+  --rose: #f2a6b3;
+  --paper: #fbf6ee;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+/* Textura sutil de "céu estrelado" para o fundo da retrospectiva */
+.night-sky {
+  background:
+    radial-gradient(1px 1px at 20% 30%, rgba(251, 246, 238, 0.5), transparent),
+    radial-gradient(1px 1px at 70% 15%, rgba(251, 246, 238, 0.35), transparent),
+    radial-gradient(1.5px 1.5px at 85% 60%, rgba(232, 180, 90, 0.4), transparent),
+    radial-gradient(1px 1px at 40% 80%, rgba(251, 246, 238, 0.3), transparent),
+    radial-gradient(1px 1px at 10% 65%, rgba(242, 166, 179, 0.3), transparent),
+    linear-gradient(180deg, var(--ink) 0%, var(--plum) 100%);
+}
+
+.text-glow-gold {
+  text-shadow: 0 0 24px rgba(232, 180, 90, 0.35);
+}
+
+/* Acessibilidade: respeitar preferência por menos movimento */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
