@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
-import { criarOrderPix } from '@/lib/mercadopago';
+import { criarOrderPix, criarPagamentoPix, emProducao } from '@/lib/mercadopago';
 import { supabaseAdmin } from '@/lib/supabase';
 
 /**
  * POST /api/checkout
  * body: { retrospectivaId: string }
- * Cria uma order Pix no Mercado Pago e devolve o QR code.
+ * Cria a cobrança Pix no Mercado Pago e devolve o QR code — via Payments
+ * API em produção e Orders API no sandbox (ver lib/mercadopago.ts).
  *
  * A confirmação do pagamento acontece pelo polling do /api/status (que
  * consulta o MP diretamente) e, em produção, também pelo webhook.
@@ -31,20 +32,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Já paga' }, { status: 409 });
     }
 
-    const order = await criarOrderPix({
+    const dadosCobranca = {
       retrospectivaId: retro.id,
       emailComprador: retro.email_comprador,
       nomeComprador: retro.nome_1,
-    });
+    };
+
+    let cobrancaId: string;
+    let pix: { qr_code?: string; qr_code_base64?: string } | undefined;
+
+    if (emProducao()) {
+      const pagamento = await criarPagamentoPix(dadosCobranca);
+      cobrancaId = String(pagamento.id);
+      pix = pagamento.point_of_interaction?.transaction_data;
+    } else {
+      const order = await criarOrderPix(dadosCobranca);
+      cobrancaId = order.id;
+      pix = order.transactions?.payments?.[0]?.payment_method;
+    }
 
     await db
       .from('retrospectivas')
-      .update({ status: 'aguardando_pagamento', payment_id: order.id })
+      .update({ status: 'aguardando_pagamento', payment_id: cobrancaId })
       .eq('id', retro.id);
 
-    const pix = order.transactions?.payments?.[0]?.payment_method;
     return NextResponse.json({
-      paymentId: order.id,
+      paymentId: cobrancaId,
       qrCode: pix?.qr_code,              // copia-e-cola
       qrCodeBase64: pix?.qr_code_base64, // imagem
     });

@@ -1,21 +1,39 @@
 import { nanoid } from 'nanoid';
 import { Resend } from 'resend';
-import { consultarOrder, orderPaga } from './mercadopago';
+import {
+  consultarOrder,
+  consultarPagamento,
+  orderPaga,
+} from './mercadopago';
 import { supabaseAdmin } from './supabase';
 
 /**
- * Consulta a order na API do Mercado Pago e, se aprovada, marca a
+ * Consulta a cobrança na API do Mercado Pago e, se aprovada, marca a
  * retrospectiva como paga e envia o e-mail de entrega. Idempotente:
  * chamadas repetidas (webhook + polling) não duplicam nada.
+ *
+ * Aceita os dois tipos de id: order do sandbox ("ORD…") e payment
+ * numérico da produção — ver lib/mercadopago.ts.
  */
 export async function confirmarPagamento(
-  orderId: string
+  cobrancaId: string
 ): Promise<{ paga: boolean; slug?: string }> {
-  // Sempre re-consultar a order na API (nunca confiar só no payload)
-  const order = await consultarOrder(orderId);
-  if (!orderPaga(order)) return { paga: false };
+  // Sempre re-consultar na API (nunca confiar só no payload recebido)
+  let aprovada: boolean;
+  let retroId: string | undefined;
 
-  const retroId = order.external_reference;
+  if (/^ORD/i.test(cobrancaId)) {
+    const order = await consultarOrder(cobrancaId);
+    aprovada = orderPaga(order);
+    retroId = order.external_reference;
+  } else {
+    const pagamento = await consultarPagamento(cobrancaId);
+    aprovada = pagamento.status === 'approved';
+    retroId = pagamento.external_reference;
+  }
+
+  if (!aprovada || !retroId) return { paga: false };
+
   const db = supabaseAdmin();
 
   const { data: retro } = await db
