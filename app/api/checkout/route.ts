@@ -63,6 +63,14 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     console.error('checkout error', err);
-    return NextResponse.json({ error: 'Erro ao criar pagamento' }, { status: 500 });
+    // "via" e "detalhe" ajudam a diagnosticar produção sem acesso ao log
+    return NextResponse.json(
+      {
+        error: 'Erro ao criar pagamento',
+        via: emProducao() ? 'payments' : 'orders',
+        detalhe: err instanceof Error ? err.message.slice(0, 160) : undefined,
+      },
+      { status: 500 }
+    );
   }
 }
