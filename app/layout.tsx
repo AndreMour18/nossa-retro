@@ -14,10 +14,26 @@ const body = Nunito_Sans({
   variable: '--font-body',
 });
 
+const title = 'Nossa Retro — a retrospectiva do seu amor';
+const description =
+  'Transforme a história de vocês em uma retrospectiva animada, com fotos, momentos e a música de vocês. O presente digital que ninguém esquece.';
+
+// Ícones e imagem de compartilhamento vêm dos arquivos em app/
+// (favicon.ico, icon.png, apple-icon.png, opengraph-image.png).
 export const metadata: Metadata = {
-  title: 'Nossa Retro — a retrospectiva do seu amor',
-  description:
-    'Transforme a história de vocês em uma retrospectiva animada, com fotos, momentos e a música de vocês. O presente digital que ninguém esquece.',
+  // Sem isso a og:image sai com URL relativa e WhatsApp/Google ignoram
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+  title,
+  description,
+  applicationName: 'Nossa Retro',
+  openGraph: {
+    title,
+    description,
+    siteName: 'Nossa Retro',
+    locale: 'pt_BR',
+    type: 'website',
+  },
+  twitter: { card: 'summary_large_image', title, description },
   robots: { index: true, follow: true },
 };
 
